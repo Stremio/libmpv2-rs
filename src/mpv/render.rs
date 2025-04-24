@@ -362,6 +362,19 @@ impl RenderContext {
         ret
     }
 
+    /// Tell the renderer that a frame was flipped at the given time. This is
+    /// optional, but can help the player to achieve better timing.
+    ///
+    /// Note that calling this at least once informs libmpv that you will use this
+    /// function. If you use it inconsistently, expect bad video playback.
+    ///
+    /// If this is called while no video is initialized, it is ignored.
+    pub fn report_swap(&self) {
+        unsafe {
+            libmpv2_sys::mpv_render_context_report_swap(self.ctx)
+        }
+    }
+
     /// Set the callback that notifies you when a new video frame is available, or if the video display
     /// configuration somehow changed and requires a redraw. Similar to [EventContext::set_wakeup_callback](crate::events::EventContext::set_wakeup_callback), you
     /// must not call any mpv API from the callback, and all the other listed restrictions apply (such
