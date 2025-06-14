@@ -531,10 +531,7 @@ impl Mpv {
         &mut self.event_context
     }
 
-    /// Send a command to the `Mpv` instance. This uses `mpv_command_string` internally,
-    /// so that the syntax is the same as described in the [manual for the input.conf](https://mpv.io/manual/master/#list-of-input-commands).
-    ///
-    /// Note that you may have to escape strings with `""` when they contain spaces.
+    /// Send a command to the `Mpv` instance.
     ///
     /// # Examples
     ///
@@ -549,16 +546,18 @@ impl Mpv {
     /// # assert_eq!(map, HashMap::from([(String::from("id"), MpvNode::Int64(1)), (String::from("current"), MpvNode::Flag(true)), (String::from("filename"), MpvNode::String(String::from("test-data/jellyfish.mp4")))]));
     /// ```
     pub fn command(&self, name: &str, args: &[&str]) -> Result<()> {
-        let mut cmd = name.to_owned();
+        let mut cstr_args: Vec<CString> = Vec::with_capacity(args.len() + 1);
+        cstr_args.push(CString::new(name)?);
 
-        for elem in args {
-            cmd.push(' ');
-            cmd.push_str(elem);
+        for arg in args {
+            cstr_args.push(CString::new(*arg)?);
         }
 
-        let raw = CString::new(cmd)?;
+        let mut ptrs: Vec<_> = cstr_args.iter().map(|cstr| cstr.as_ptr()).collect();
+        ptrs.push(std::ptr::null());
+
         mpv_err((), unsafe {
-            libmpv2_sys::mpv_command_string(self.ctx.as_ptr(), raw.as_ptr())
+            libmpv2_sys::mpv_command(self.ctx.as_ptr(), ptrs.as_mut_ptr())
         })
     }
 
