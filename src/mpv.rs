@@ -249,12 +249,12 @@ unsafe impl Sync for Mpv {}
 
 impl Drop for Mpv {
     fn drop(&mut self) {
-        if let Some(wakeup_callback_cleanup) = self.wakeup_callback_cleanup.take() {
-            wakeup_callback_cleanup();
-        }
-
         unsafe {
             libmpv2_sys::mpv_destroy(self.ctx.as_ptr());
+        }
+
+        if let Some(wakeup_callback_cleanup) = self.wakeup_callback_cleanup.take() {
+            wakeup_callback_cleanup();
         }
     }
 }
