@@ -156,3 +156,29 @@ fn config_file() {
     .unwrap();
     assert_eq!(mpv.get_property::<i64>("volume").unwrap(), 50);
 }
+
+#[test]
+fn async_replies() {
+    let mpv = Mpv::new().unwrap();
+    mpv.disable_deprecated_events().unwrap();
+
+    mpv.set_property_async("does-not-exist", true, 1).unwrap();
+    assert_event_occurs!(
+        mpv,
+        3.,
+        Ok(Event::SetPropertyReply {
+            reply_userdata: 1,
+            result: Err(_)
+        })
+    );
+
+    mpv.command_async("stop", &[], 2).unwrap();
+    assert_event_occurs!(
+        mpv,
+        3.,
+        Ok(Event::CommandReply {
+            reply_userdata: 2,
+            result: Ok(())
+        })
+    );
+}

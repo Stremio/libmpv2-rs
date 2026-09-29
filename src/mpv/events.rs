@@ -83,9 +83,15 @@ pub enum Event<'a> {
         reply_userdata: u64,
     },
     /// Received when using set_property_async
-    SetPropertyReply(u64),
+    SetPropertyReply {
+        reply_userdata: u64,
+        result: Result<()>,
+    },
     /// Received when using command_async
-    CommandReply(u64),
+    CommandReply {
+        reply_userdata: u64,
+        result: Result<()>,
+    },
     /// Event received when a new file is playing
     StartFile,
     /// Event received when the file being played currently has stopped, for an error or not
@@ -184,11 +190,15 @@ impl Mpv {
     /// This function is intended to be called repeatedly in a wait-event loop.
     ///
     /// Returns `Some(Err(...))` if there was invalid utf-8, or if either an
-    /// `MPV_EVENT_GET_PROPERTY_REPLY`, `MPV_EVENT_SET_PROPERTY_REPLY`, `MPV_EVENT_COMMAND_REPLY`,
-    /// or `MPV_EVENT_PROPERTY_CHANGE` event failed, or if `MPV_EVENT_END_FILE` reported an error.
+    /// `MPV_EVENT_GET_PROPERTY_REPLY` or `MPV_EVENT_PROPERTY_CHANGE` event failed,
+    /// or if `MPV_EVENT_END_FILE` reported an error. Set-property and command
+    /// replies carry their own result.
     pub fn wait_event(&self, timeout: f64) -> Option<Result<Event<'_>>> {
         let event = unsafe { *libmpv2_sys::mpv_wait_event(self.ctx.as_ptr(), timeout) };
-        if event.event_id != mpv_event_id::None {
+        if !matches!(
+            event.event_id,
+            mpv_event_id::None | mpv_event_id::SetPropertyReply | mpv_event_id::CommandReply
+        ) {
             if let Err(e) = mpv_err((), event.error) {
                 return Some(Err(e));
             }
@@ -226,14 +236,14 @@ impl Mpv {
                     })
                 }))
             }
-            mpv_event_id::SetPropertyReply => Some(mpv_err(
-                Event::SetPropertyReply(event.reply_userdata),
-                event.error,
-            )),
-            mpv_event_id::CommandReply => Some(mpv_err(
-                Event::CommandReply(event.reply_userdata),
-                event.error,
-            )),
+            mpv_event_id::SetPropertyReply => Some(Ok(Event::SetPropertyReply {
+                reply_userdata: event.reply_userdata,
+                result: mpv_err((), event.error),
+            })),
+            mpv_event_id::CommandReply => Some(Ok(Event::CommandReply {
+                reply_userdata: event.reply_userdata,
+                result: mpv_err((), event.error),
+            })),
             mpv_event_id::StartFile => Some(Ok(Event::StartFile)),
             mpv_event_id::EndFile => {
                 let end_file = unsafe { *(event.data as *mut libmpv2_sys::mpv_event_end_file) };

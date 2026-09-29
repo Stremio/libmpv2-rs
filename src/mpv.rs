@@ -395,6 +395,52 @@ impl Mpv {
         })
     }
 
+    /// Send a command without waiting for it to run. The result arrives as
+    /// `Event::CommandReply` with `reply_userdata`.
+    pub fn command_async(&self, name: &str, args: &[&str], reply_userdata: u64) -> Result<()> {
+        let mut cstr_args: Vec<CString> = Vec::with_capacity(args.len() + 1);
+        cstr_args.push(CString::new(name)?);
+
+        for arg in args {
+            cstr_args.push(CString::new(*arg)?);
+        }
+
+        let mut ptrs: Vec<_> = cstr_args.iter().map(|cstr| cstr.as_ptr()).collect();
+        ptrs.push(std::ptr::null());
+
+        mpv_err((), unsafe {
+            libmpv2_sys::mpv_command_async(self.ctx.as_ptr(), reply_userdata, ptrs.as_mut_ptr())
+        })
+    }
+
+    /// Abort asynchronous commands sent with `reply_userdata`, if they support it.
+    pub fn abort_async_command(&self, reply_userdata: u64) {
+        unsafe { libmpv2_sys::mpv_abort_async_command(self.ctx.as_ptr(), reply_userdata) }
+    }
+
+    /// Set a property without waiting for it to apply. The result arrives as
+    /// `Event::SetPropertyReply` with `reply_userdata`.
+    pub fn set_property_async<T: SetData>(
+        &self,
+        name: &str,
+        data: T,
+        reply_userdata: u64,
+    ) -> Result<()> {
+        let name = CString::new(name)?;
+        let format = T::get_format().as_mpv_format() as _;
+        data.call_as_c_void(|ptr| {
+            mpv_err((), unsafe {
+                libmpv2_sys::mpv_set_property_async(
+                    self.ctx.as_ptr(),
+                    reply_userdata,
+                    name.as_ptr(),
+                    format,
+                    ptr,
+                )
+            })
+        })
+    }
+
     /// Set a property to a given value. Properties are essentially variables which
     /// can be queried or set at runtime. For example, writing to the pause property
     /// will actually pause or unpause playback.
