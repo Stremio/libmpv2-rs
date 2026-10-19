@@ -371,18 +371,15 @@ impl Mpv {
     ///            modified to fit. If `None`, an arbitrary name is automatically
     ///            chosen.
     pub fn create_client(&self, name: Option<&str>) -> Result<Mpv> {
+        let name = name.map(CString::new).transpose()?;
         let mpv_handle = unsafe {
             libmpv2_sys::mpv_create_client(
                 self.ctx.as_ptr(),
-                if let Some(name) = name {
-                    CString::new(name)?.as_ptr()
-                } else {
-                    ptr::null()
-                },
+                name.as_ref().map_or(ptr::null(), |name| name.as_ptr()),
             )
         };
 
-        let ctx = unsafe { NonNull::new_unchecked(mpv_handle) };
+        let ctx = NonNull::new(mpv_handle).ok_or(Error::Null)?;
 
         Ok(Mpv {
             ctx,

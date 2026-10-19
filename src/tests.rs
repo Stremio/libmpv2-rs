@@ -1,6 +1,7 @@
 use crate::events::{Event, PropertyData};
 use crate::*;
 
+use std::ffi::CStr;
 use std::thread;
 use std::time::Duration;
 
@@ -18,6 +19,15 @@ fn initializer() {
     assert_eq!(true, mpv.get_property("osc").unwrap());
     assert_eq!(true, mpv.get_property("input-default-bindings").unwrap());
     assert_eq!(30i64, mpv.get_property("volume").unwrap());
+}
+
+#[test]
+fn create_client() {
+    let mpv = Mpv::new().unwrap();
+    let client = mpv.create_client(Some("event-loop")).unwrap();
+    let name = unsafe { CStr::from_ptr(libmpv2_sys::mpv_client_name(client.ctx.as_ptr())) };
+
+    assert_eq!("event_loop", name.to_str().unwrap());
 }
 
 #[test]
